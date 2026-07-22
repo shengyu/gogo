@@ -6,7 +6,7 @@ resources:
   - service.yaml
 
 configMapGenerator:
-  - name: gin-api-config
+  - name: gogo-config
     literals:
       - APP_ENV=local
       - LOG_LEVEL=info

@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: gin-api-prod
+namespace: gogo-prod
 
 resources:
   - ../../base
@@ -14,7 +14,7 @@ images:
     newTag: 1.0.0
 
 configMapGenerator:
-  - name: gin-api-config
+  - name: gogo-config
     behavior: merge
     literals:
       - APP_ENV=prod

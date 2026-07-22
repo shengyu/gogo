@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: gin-api
+  name: gogo
   labels:
-    app.kubernetes.io/name: gin-api
+    app.kubernetes.io/name: gogo
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: gin-api
+    app.kubernetes.io/name: gogo
   ports:
     - name: http
       port: 80

@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gin-api
+  name: gogo
   labels:
-    app.kubernetes.io/name: gin-api
+    app.kubernetes.io/name: gogo
 spec:
   replicas: 1
   revisionHistoryLimit: 3
@@ -14,11 +14,11 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: gin-api
+      app.kubernetes.io/name: gogo
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: gin-api
+        app.kubernetes.io/name: gogo
     spec:
       terminationGracePeriodSeconds: 30
       securityContext:
@@ -35,7 +35,7 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: gin-api-config
+                name: gogo-config
           startupProbe:
             httpGet:
               path: /healthz

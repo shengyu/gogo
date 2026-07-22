@@ -30,7 +30,7 @@ kind-load-dev: build-image
 
 deploy-dev:
 	kubectl apply -k deploy/overlays/dev
-	kubectl rollout status deployment/gin-api -n gin-api-dev
+	kubectl rollout status deployment/gogo -n gogo-dev
 
 deploy-prod:
 	kubectl apply -k deploy/overlays/prod
