@@ -14,7 +14,7 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		Port:            getEnv("PORT", "8080"),
+		Port:            getEnv("PORT", "8081"),
 		Environment:     getEnv("APP_ENV", "local"),
 		LogLevel:        getEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
