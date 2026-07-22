@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+configMapGenerator:
+  - name: gin-api-config
+    literals:
+      - APP_ENV=local
+      - LOG_LEVEL=info
+      - PORT=8080
+      - SHUTDOWN_TIMEOUT=10s
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: gogo
+      app.kubernetes.io/managed-by: kustomize
