@@ -1,0 +1,141 @@
+name: Promote release to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "The immutable sha-<commit> image currently tested in dev"
+        required: true
+        type: string
+      release_tag:
+        description: "The production version, for example v1.2.3"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: promote-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: usungu/gogo
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Resolve tested dev image
+        id: candidate
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must use a version such as v1.2.3" >&2
+            exit 1
+          fi
+
+          if [[ ! "${IMAGE_TAG}" =~ ^sha-[0-9a-f]{40}$ ]]; then
+            echo "image_tag must use sha-<40 character commit SHA>" >&2
+            exit 1
+          fi
+
+          DEV_TAG=$(awk '$1 == "newTag:" { print $2 }' deploy/overlays/dev/kustomization.yaml)
+          if [[ "${DEV_TAG}" != "${IMAGE_TAG}" ]]; then
+            echo "Dev currently references ${DEV_TAG}, not ${IMAGE_TAG}" >&2
+            exit 1
+          fi
+
+          SOURCE_SHA=${IMAGE_TAG#sha-}
+          if ! git cat-file -e "${SOURCE_SHA}^{commit}"; then
+            echo "The dev image commit is not present in the default branch history" >&2
+            exit 1
+          fi
+
+          echo "source_tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "source_sha=${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: usungu
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tag tested image as release
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_TAG: ${{ steps.candidate.outputs.source_tag }}
+        run: |
+          docker buildx imagetools inspect "${IMAGE_NAME}:${SOURCE_TAG}"
+          docker buildx imagetools create \
+            --tag "${IMAGE_NAME}:${RELEASE_TAG}" \
+            "${IMAGE_NAME}:${SOURCE_TAG}"
+
+      - name: Create production promotion pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+        run: |
+          PROMOTION_BRANCH="promote/${RELEASE_TAG}"
+          git fetch origin "${DEFAULT_BRANCH}"
+
+          CURRENT_TAG=$(git show "origin/${DEFAULT_BRANCH}:deploy/overlays/prod/kustomization.yaml" | awk '$1 == "newTag:" { print $2 }')
+          if [[ "${CURRENT_TAG}" == "${RELEASE_TAG}" ]]; then
+            echo "Production already references ${RELEASE_TAG}"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --heads origin "${PROMOTION_BRANCH}" >/dev/null; then
+            git fetch origin "${PROMOTION_BRANCH}:refs/remotes/origin/${PROMOTION_BRANCH}"
+            git checkout -B "${PROMOTION_BRANCH}" "origin/${PROMOTION_BRANCH}"
+          else
+            git checkout -B "${PROMOTION_BRANCH}" "origin/${DEFAULT_BRANCH}"
+          fi
+
+          sed -i.bak -E "s|^(    newName: ).*|\\1${IMAGE_NAME}|" deploy/overlays/prod/kustomization.yaml
+          sed -i.bak -E "s|^(    newTag: ).*|\\1${RELEASE_TAG}|" deploy/overlays/prod/kustomization.yaml
+          rm -f deploy/overlays/prod/kustomization.yaml.bak
+
+          kubectl kustomize deploy/overlays/prod >/dev/null
+
+          if ! git diff --quiet; then
+            git diff --check
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add deploy/overlays/prod/kustomization.yaml
+            git commit -m "chore(deploy): promote ${RELEASE_TAG}"
+            git push origin "HEAD:${PROMOTION_BRANCH}"
+          fi
+
+          EXISTING_PR=$(gh pr list \
+            --base "${DEFAULT_BRANCH}" \
+            --head "${PROMOTION_BRANCH}" \
+            --state open \
+            --json url \
+            --jq '.[0].url')
+
+          if [[ -n "${EXISTING_PR}" ]]; then
+            echo "Production promotion PR already exists: ${EXISTING_PR}"
+            exit 0
+          fi
+
+          gh pr create \
+            --base "${DEFAULT_BRANCH}" \
+            --head "${PROMOTION_BRANCH}" \
+            --title "chore(deploy): promote ${RELEASE_TAG}" \
+            --body "Promotes the dev-tested image from commit ${SOURCE_SHA} to production as ${IMAGE_NAME}:${RELEASE_TAG}."
