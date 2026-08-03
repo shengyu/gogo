@@ -10,8 +10,8 @@ resources:
 
 images:
   - name: gogo
-    newName: registry.example.com/platform/gogo
-    newTag: 1.0.0
+    newName: usungu/gogo
+    newTag: v1.0.0
 
 configMapGenerator:
   - name: gogo-config
