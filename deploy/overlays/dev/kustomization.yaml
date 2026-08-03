@@ -9,8 +9,8 @@ resources:
 
 images:
   - name: gogo
-    newName: gogo
-    newTag: dev
+    newName: usungu/gogo
+    newTag: sha-af8020a8aa51a1c277701f92351fe84c458e7e11
 
 configMapGenerator:
   - name: gogo-config
