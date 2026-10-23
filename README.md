@@ -39,3 +39,7 @@ Still becoming.
 ## License
 
 Maintained for personal exploration, experimentation, and the occasional useful surprise.
+
+## Mock API
+
+The independent practice server lives in [mock/](mock/README.md). From this directory, use `make mock` to start it, `make mock-transient` to enable transient failures, and `make mock-test` to run its tests. The main service runs separately with `make run`.

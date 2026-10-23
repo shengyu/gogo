@@ -2,13 +2,22 @@ APP := gogo
 DEV_IMAGE := $(APP):dev
 KIND_CLUSTER ?= kind
 
-.PHONY: run test fmt tidy build-image render-dev render-prod deploy-dev deploy-prod kind-load-dev clean-dev
+.PHONY: run test mock mock-transient mock-test fmt tidy build-image render-dev render-prod deploy-dev deploy-prod kind-load-dev clean-dev
 
 run:
 	go run ./cmd/server
 
 test:
 	go test ./...
+
+mock:
+	cd mock && MOCK_SCENARIO=normal go run .
+
+mock-transient:
+	cd mock && MOCK_SCENARIO=transient go run .
+
+mock-test:
+	cd mock && go test ./...
 
 fmt:
 	gofmt -w ./cmd ./internal
